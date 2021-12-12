@@ -9,11 +9,7 @@
 
 #include <stale.h>
 #include <led.h>
-
-int addr_ssid = 0;						// ssid index
-int addr_password = 20;					// password index
-String ssid = "wifi_ssid";				// wifi ssid
-String password = "wifi_password_demo"; // and password
+#include <tof.h>
 
 // Set to true to reset eeprom before to write something
 #define RESET_EEPROM true
@@ -31,6 +27,11 @@ const char *password = STAPSK;
 const char *host = "192.168.8.5";
 const uint16_t port = 80;
 
+bool tryb_konfiguracji = false;
+bool konfiguracja_zakonczona = false;
+
+unsigned long timer1 = millis();
+
 void ustawienia_pinow()
 {
 	pinMode(IR_OUT, INPUT);
@@ -41,7 +42,7 @@ void ustawienia_pinow()
 
 void eeprom_conf()
 {
-	EEPROM.begin(512);
+	EEPROM.begin(2048);
 	Serial.println("");
 
 	Serial.println("");
@@ -63,6 +64,18 @@ void eeprom_conf()
 	Serial.println(password);
 }
 
+void zapisz_do_eeprom( string wartosc ){
+
+
+
+}
+
+uint16_t czytaj_z_eeprom(){
+
+
+
+}
+
 void setup()
 {
 
@@ -71,6 +84,14 @@ void setup()
 	ustawienia_pinow();
 
 	Wire.begin(TOF_SDA, TOF_SCL);
+		if (!tofsensor.init())
+		Serial.println("Nie mozna zaladowac VL53L0X");
+
+	if (analogRead(A0) > 100){
+		tryb_konfiguracji = true;
+		return;
+	}
+
 
 	Serial.println();
 	Serial.println();
@@ -94,59 +115,31 @@ void setup()
 	Serial.println("IP address: ");
 	Serial.println(WiFi.localIP());
 
-	if (!tofsensor.init())
-		Serial.println("Nie mozna zaladowac VL53L0X");
 
-	if (analogRead(A0) < 100)
-	{
 
-		for (int i = 0; i < 512; i++)
-		{
-			EEPROM.write(i, 0);
-		}
-		EEPROM.commit();
-		delay(500);
 
-		Serial.println("");
-		Serial.print("Write WiFi SSID at address ");
-		Serial.println(addr_ssid);
-		Serial.print("");
-		for (int i = 0; i < ssid.length(); ++i)
-		{
-			EEPROM.write(addr_ssid + i, ssid[i]);
-			Serial.print(ssid[i]);
-			Serial.print("");
-		}
-
-		Serial.println("");
-		Serial.print("Write WiFi Password at address ");
-		Serial.println(addr_password);
-		Serial.print("");
-		for (int j = 0; j < password.length(); j++)
-		{
-			EEPROM.write(addr_password + j, password[j]);
-			Serial.print(password[j]);
-			Serial.print("");
-		}
-
-		Serial.println("");
-		if (EEPROM.commit())
-		{
-			Serial.println("Data successfully committed");
-		}
-		else
-		{
-			Serial.println("ERROR! Data commit failed");
-		}
-
-		return;
-	}
 }
 
 void loop()
 {
 
-	uint16_t zasieg_tof = tofsensor.readRangeSingleMillimeters();
+// Praca z opźnieniem czasowym 50ms
+if( millis() - timer1 < 50 ) return;
+
+uint16_t zasieg_tof = tofsensor.readRangeSingleMillimeters();
+
+if(tryb_konfiguracji){
+	if( konfiguracja_zakonczona ) return;
+
+	zapisz_do_eeprom(String(zasieg_tof));
+	
+	konfiguracja_zakonczona = true;
+
+	return;
+}
+
+	WiFiClient client;
+	HTTPClient http; //must be declared after WiFiClient for correct destruction order, because used by http.begin(client,...)
 
 	static bool wait = false;
 
@@ -155,14 +148,29 @@ void loop()
 	Serial.print(':');
 	Serial.println(port);
 
-	WiFiClient client;
-	HTTPClient http; //must be declared after WiFiClient for correct destruction order, because used by http.begin(client,...)
+// Odczytanie wartosci zapisanej odleflosci do obiektu
+uint8_t odczytany_tof = czytaj_z_eeprom();
+
+if( zasieg_tof > odczytany_tof + 10 || zasieg_tof < odczytany_tof - 10  ){
+	// Odleglosc do obiektu nie zgadza sie z wartoscia zapisana
+	// Wyslanie sygnalu do odbiornika
 
 	Serial.print("[HTTP] begin...\n");
 
-	// configure server and url
-	http.begin(client, "http://192.168.8.5/");
+	// Wyslanie wiadomosci wylaczajacej przekaznik
+	http.begin(client, "http://192.168.8.5/drzwi_otwarte");
 	//http.begin(client, "jigsaw.w3.org", 80, "/HTTP/connection.html");
+
+}else{
+
+	Serial.print("[HTTP] begin...\n");
+
+	// Wyslanie wiadomosci wylaczajacej przekaznik
+	http.begin(client, "http://192.168.8.5/drzwi_zamkniete");
+	//http.begin(client, "jigsaw.w3.org", 80, "/HTTP/connection.html");
+
+}
+
 
 	Serial.print("[HTTP] GET...\n");
 	// start connection and send HTTP header
@@ -182,7 +190,7 @@ void loop()
 			// create buffer for read
 			uint8_t buff[128] = {0};
 
-#if 0
+#if 1
         // with API
         Serial.println(http.getString());
 #else
@@ -222,4 +230,7 @@ void loop()
 	}
 
 	http.end();
+
+
+	timer1 = millis();
 }

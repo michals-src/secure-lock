@@ -79,17 +79,5 @@ public:
 
         zapisCzas = millis();
     }
-
-    static void NiskiPoziomBaterii(uint16_t min_wartosc, uint16_t aktualna_wartosc)
-    {
-        if (aktualna_wartosc > min_wartosc)
-            return;
-
-        if (millis() - zapisCzas > 3000)
-        {
-            digitalWrite(LED_RED, led_ostatni_stan);
-            zapisCzas = millis();
-            led_ostatni_stan = !led_ostatni_stan;
-        }
-    }
+    
 };
