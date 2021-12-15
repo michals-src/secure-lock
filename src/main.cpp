@@ -40,6 +40,8 @@ void ustawienia_pinow()
 	pinMode(LED_BLUE, OUTPUT);
 }
 
+/*
+
 void eeprom_conf()
 {
 	EEPROM.begin(2048);
@@ -64,16 +66,19 @@ void eeprom_conf()
 	Serial.println(password);
 }
 
-void zapisz_do_eeprom( string wartosc ){
-
-
-
+void zapisz_do_eeprom(string wartosc)
+{
+	String a = wartosc;
 }
 
-uint16_t czytaj_z_eeprom(){
 
 
+*/
 
+uint16_t czytaj_z_eeprom()
+{
+
+	return 0;
 }
 
 void setup()
@@ -84,14 +89,14 @@ void setup()
 	ustawienia_pinow();
 
 	Wire.begin(TOF_SDA, TOF_SCL);
-		if (!tofsensor.init())
+	if (!tofsensor.init())
 		Serial.println("Nie mozna zaladowac VL53L0X");
 
-	if (analogRead(A0) > 100){
+	if (analogRead(A0) > 100)
+	{
 		tryb_konfiguracji = true;
 		return;
 	}
-
 
 	Serial.println();
 	Serial.println();
@@ -106,80 +111,80 @@ void setup()
 
 	while (WiFi.status() != WL_CONNECTED)
 	{
-		delay(500);
-		Serial.print(".");
+		Led::LaczenieWiFi(false);
 	}
+
+	Led::LaczenieWiFi(true);
 
 	Serial.println("");
 	Serial.println("WiFi connected");
 	Serial.println("IP address: ");
 	Serial.println(WiFi.localIP());
-
-
-
-
 }
 
 void loop()
 {
 
-// Praca z opźnieniem czasowym 50ms
-if( millis() - timer1 < 50 ) return;
+	// Praca z opźnieniem czasowym 50ms
+	//if (millis() - timer1 < 50)
+	//	return;
 
-uint16_t zasieg_tof = tofsensor.readRangeSingleMillimeters();
+	uint16_t zasieg_tof = tofsensor.readRangeSingleMillimeters();
 
-if(tryb_konfiguracji){
-	if( konfiguracja_zakonczona ) return;
+	Serial.println(String(zasieg_tof));
 
-	zapisz_do_eeprom(String(zasieg_tof));
-	
-	konfiguracja_zakonczona = true;
-
+	delay(50);
 	return;
-}
+
+	if (tryb_konfiguracji)
+	{
+		if (konfiguracja_zakonczona)
+			return;
+
+		//zapisz_do_eeprom(String(zasieg_tof));
+		String zasieg_tof_str = String(zasieg_tof);
+		Tof::zapisz(zasieg_tof_str);
+
+		konfiguracja_zakonczona = true;
+
+		return;
+	}
 
 	WiFiClient client;
 	HTTPClient http; //must be declared after WiFiClient for correct destruction order, because used by http.begin(client,...)
-
-	static bool wait = false;
 
 	Serial.print("connecting to ");
 	Serial.print(host);
 	Serial.print(':');
 	Serial.println(port);
 
-// Odczytanie wartosci zapisanej odleflosci do obiektu
-uint8_t odczytany_tof = czytaj_z_eeprom();
+	// Odczytanie wartosci zapisanej odleflosci do obiektu
+	uint8_t odczytany_tof = czytaj_z_eeprom();
 
-if( zasieg_tof > odczytany_tof + 10 || zasieg_tof < odczytany_tof - 10  ){
-	// Odleglosc do obiektu nie zgadza sie z wartoscia zapisana
-	// Wyslanie sygnalu do odbiornika
+	if (zasieg_tof > odczytany_tof + 10 || zasieg_tof < odczytany_tof - 10)
+	{
+		// Odleglosc do obiektu nie zgadza sie z wartoscia zapisana
+		// Wyslanie sygnalu do odbiornika
 
-	Serial.print("[HTTP] begin...\n");
+		Serial.print("[HTTP] begin...\n");
 
-	// Wyslanie wiadomosci wylaczajacej przekaznik
-	http.begin(client, "http://192.168.8.5/drzwi_otwarte");
-	//http.begin(client, "jigsaw.w3.org", 80, "/HTTP/connection.html");
+		// Wyslanie wiadomosci wylaczajacej przekaznik
+		http.begin(client, "http://192.168.8.5/drzwi_otwarte");
+		//http.begin(client, "jigsaw.w3.org", 80, "/HTTP/connection.html");
+	}
+	else
+	{
 
-}else{
+		Serial.print("[HTTP] begin...\n");
 
-	Serial.print("[HTTP] begin...\n");
+		// Wyslanie wiadomosci wylaczajacej przekaznik
+		http.begin(client, "http://192.168.8.5/drzwi_zamkniete");
+		//http.begin(client, "jigsaw.w3.org", 80, "/HTTP/connection.html");
+	}
 
-	// Wyslanie wiadomosci wylaczajacej przekaznik
-	http.begin(client, "http://192.168.8.5/drzwi_zamkniete");
-	//http.begin(client, "jigsaw.w3.org", 80, "/HTTP/connection.html");
-
-}
-
-
-	Serial.print("[HTTP] GET...\n");
-	// start connection and send HTTP header
 	int httpCode = http.GET();
 	if (httpCode > 0)
 	{
-		// HTTP header has been send and Server response header has been handled
-		Serial.printf("[HTTP] GET... code: %d\n", httpCode);
-
 		// file found at server
 		if (httpCode == HTTP_CODE_OK)
 		{
@@ -191,8 +196,8 @@ if( zasieg_tof > odczytany_tof + 10 || zasieg_tof < odczytany_tof - 10  ){
 			uint8_t buff[128] = {0};
 
 #if 1
-        // with API
-        Serial.println(http.getString());
+			// with API
+			Serial.println(http.getString());
 #else
 			// or "by hand"
 
@@ -230,7 +235,6 @@ if( zasieg_tof > odczytany_tof + 10 || zasieg_tof < odczytany_tof - 10  ){
 	}
 
 	http.end();
-
 
 	timer1 = millis();
 }
