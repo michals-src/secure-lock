@@ -35,6 +35,7 @@ unsigned long timer1 = millis();
 void ustawienia_pinow()
 {
 	pinMode(IR_OUT, INPUT);
+	pinMode(LED_VCC, OUTPUT);
 	pinMode(LED_RED, OUTPUT);
 	pinMode(LED_GREEN, OUTPUT);
 	pinMode(LED_BLUE, OUTPUT);
@@ -109,46 +110,50 @@ void setup()
 	WiFi.mode(WIFI_STA);
 	WiFi.begin(ssid, password);
 
+	digitalWrite(LED_VCC, 1);
+
 	while (WiFi.status() != WL_CONNECTED)
 	{
 		Led::LaczenieWiFi(false);
 	}
 
-	Led::LaczenieWiFi(true);
-
-	Serial.println("");
-	Serial.println("WiFi connected");
-	Serial.println("IP address: ");
-	Serial.println(WiFi.localIP());
+	// Serial.println("");
+	// Serial.println("WiFi connected");
+	// Serial.println("IP address: ");
+	// Serial.println(WiFi.localIP());
 }
 
 void loop()
 {
 
 	// Praca z opźnieniem czasowym 50ms
-	//if (millis() - timer1 < 50)
-	//	return;
+	if (millis() - timer1 < 10)
+		return;
 
-	uint16_t zasieg_tof = tofsensor.readRangeSingleMillimeters();
+	timer1 = millis();
 
-	Serial.println(String(zasieg_tof));
+	//uint16_t zasieg_tof = tofsensor.readRangeSingleMillimeters();
+	uint8_t zasieg_tof = 0;
 
-	delay(50);
-	return;
+	// Serial.println(String(zasieg_tof));
 
 	if (tryb_konfiguracji)
 	{
+		Led::Konfiguracja(konfiguracja_zakonczona);
+
 		if (konfiguracja_zakonczona)
 			return;
 
 		//zapisz_do_eeprom(String(zasieg_tof));
-		String zasieg_tof_str = String(zasieg_tof);
-		Tof::zapisz(zasieg_tof_str);
+		//String zasieg_tof_str = String(zasieg_tof);
+		//Tof::zapisz(zasieg_tof_str);
 
 		konfiguracja_zakonczona = true;
 
 		return;
 	}
+
+	Led::LaczenieWiFi(true);
 
 	WiFiClient client;
 	HTTPClient http; //must be declared after WiFiClient for correct destruction order, because used by http.begin(client,...)
@@ -178,63 +183,38 @@ void loop()
 		Serial.print("[HTTP] begin...\n");
 
 		// Wyslanie wiadomosci wylaczajacej przekaznik
-		http.begin(client, "http://192.168.8.5/drzwi_zamkniete");
+		//http.begin(client, "http://192.168.8.5/drzwi_zamkniete");
+		http.begin(client, "http://192.168.8.5/");
 		//http.begin(client, "jigsaw.w3.org", 80, "/HTTP/connection.html");
 	}
 
 	int httpCode = http.GET();
+	bool httpStan = false;
+
 	if (httpCode > 0)
 	{
+
+		httpStan = Led::HttpStan(httpCode == HTTP_CODE_OK);
 		// file found at server
-		if (httpCode == HTTP_CODE_OK)
+		if (httpStan)
 		{
-
-			// get length of document (is -1 when Server sends no Content-Length header)
-			int len = http.getSize();
-
-			// create buffer for read
-			uint8_t buff[128] = {0};
-
-#if 1
-			// with API
-			Serial.println(http.getString());
-#else
-			// or "by hand"
-
-			// get tcp stream
-			WiFiClient *stream = &client;
-
-			// read all data from server
-			while (http.connected() && (len > 0 || len == -1))
-			{
-				// read up to 128 byte
-				int c = stream->readBytes(buff, std::min((size_t)len, sizeof(buff)));
-				Serial.printf("readBytes: %d\n", c);
-				if (!c)
-				{
-					Serial.println("read timeout");
-				}
-
-				// write it to Serial
-				Serial.write(buff, c);
-
-				if (len > 0)
-				{
-					len -= c;
-				}
-			}
-#endif
-
-			Serial.println();
-			Serial.print("[HTTP] connection closed or file end.\n");
+			Serial.println("[HTTP] HTTP_CODE_OK.");
+			Serial.println("[HTTP] zamknięto połączenie lub zakończenie pliku.");
 		}
 	}
 	else
 	{
-		Serial.printf("[HTTP] GET... failed, error: %s\n", http.errorToString(httpCode).c_str());
+		httpStan = Led::HttpStan(false);
+		Serial.printf("[HTTP] GET... niepowodzenie, error: %s\n", http.errorToString(httpCode).c_str());
 	}
 
 	http.end();
 
-	timer1 = millis();
+	// Przejście w stan deepSleep
+	// jeżeli odpowiedź serwera ma kod 200 => OK
+	if (httpStan)
+	{
+		digitalWrite(LED_VCC, 1);
+		ESP.deepSleep(0);
+	}
 }

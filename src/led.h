@@ -20,14 +20,14 @@ public:
         }
 
         //Miganie diody co 150ms, potwierdzajace zakończenie konfiguracji
-        if (millis() - zapisCzas > 150)
+        if (millis() - Led::zapisCzas > 300)
         {
             digitalWrite(LED_GREEN, led_ostatni_stan);
             digitalWrite(LED_BLUE, led_ostatni_stan);
             led_ostatni_stan = !led_ostatni_stan;
-        }
 
-        zapisCzas = millis();
+            Led::zapisCzas = millis();
+        }
     }
 
     static void LaczenieWiFi(bool statusWiFi)
@@ -64,43 +64,45 @@ public:
                 Led::led_ostatni_stan = false;
             }
 
-            // for (uint16_t i = 0; i < 100; i++)
-            // {
-            //     if (statusWiFi)
-            //         break;
-            //     if (millis() - Led::zapisCzas < 150)
-            //         return;
-
-            //     analogWrite(LED_BLUE, i);
-            //     Serial.println(i);
-            // }
-            // // for (uint16_t i = 1023; i >= 0; i--)
-            // {
-            //     if (statusWiFi)
-            //         break;
-            //     if (millis() - zapisCzas > 1)
-            //     {
-            //         analogWrite(LED_BLUE, i);
-            //         zapisCzas = millis();
-            //     }
-            // }
-
             Led::zapisCzas = millis();
 
             return;
         }
 
-        if (millis() - zapisCzas < 5000)
+        if (millis() - Led::zapisCzas < 5000)
         {
             digitalWrite(LED_GREEN, 0);
-            digitalWrite(LED_BLUE, 1);
-            zapisCzas = millis();
+
             return;
         }
 
         digitalWrite(LED_GREEN, 1);
+    }
 
-        zapisCzas = millis();
+    static bool HttpStan(bool server_stan)
+    {
+
+        if (server_stan)
+        {
+            if (millis() - Led::zapisCzas < 1500)
+            {
+                digitalWrite(LED_BLUE, 0);
+                return false;
+            }
+
+            digitalWrite(LED_BLUE, 1);
+            return true;
+        }
+
+        if (millis() - Led::zapisCzas < 450)
+            return false;
+
+        digitalWrite(LED_BLUE, 1);
+        digitalWrite(LED_RED, led_ostatni_stan);
+        led_ostatni_stan = !led_ostatni_stan;
+        Led::zapisCzas = millis();
+
+        return false;
     }
 };
 
