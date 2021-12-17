@@ -108,14 +108,14 @@ void setup()
      would try to act as both a client and an access-point and could cause
      network-issues with your other WiFi-devices on your WiFi-network. */
 	WiFi.mode(WIFI_STA);
-	WiFi.begin(ssid, password);
+	//WiFi.begin(ssid, password);
 
 	digitalWrite(LED_VCC, 1);
 
-	while (WiFi.status() != WL_CONNECTED)
-	{
-		Led::LaczenieWiFi(false);
-	}
+	// while (WiFi.status() != WL_CONNECTED)
+	// {
+	// 	Led::LaczenieWiFi(false);
+	// }
 
 	// Serial.println("");
 	// Serial.println("WiFi connected");
@@ -123,37 +123,11 @@ void setup()
 	// Serial.println(WiFi.localIP());
 }
 
-void loop()
+bool abc()
 {
 
-	// Praca z opźnieniem czasowym 50ms
-	if (millis() - timer1 < 10)
-		return;
-
-	timer1 = millis();
-
-	//uint16_t zasieg_tof = tofsensor.readRangeSingleMillimeters();
+	bool httpStan = false;
 	uint8_t zasieg_tof = 0;
-
-	// Serial.println(String(zasieg_tof));
-
-	if (tryb_konfiguracji)
-	{
-		Led::Konfiguracja(konfiguracja_zakonczona);
-
-		if (konfiguracja_zakonczona)
-			return;
-
-		//zapisz_do_eeprom(String(zasieg_tof));
-		//String zasieg_tof_str = String(zasieg_tof);
-		//Tof::zapisz(zasieg_tof_str);
-
-		konfiguracja_zakonczona = true;
-
-		return;
-	}
-
-	Led::LaczenieWiFi(true);
 
 	WiFiClient client;
 	HTTPClient http; //must be declared after WiFiClient for correct destruction order, because used by http.begin(client,...)
@@ -189,7 +163,6 @@ void loop()
 	}
 
 	int httpCode = http.GET();
-	bool httpStan = false;
 
 	if (httpCode > 0)
 	{
@@ -210,11 +183,106 @@ void loop()
 
 	http.end();
 
+	return httpStan;
+}
+
+void loop()
+{
+
+	// Praca z opźnieniem czasowym 50ms
+	if (millis() - timer1 < 10)
+		return;
+
+	timer1 = millis();
+
+	//uint16_t zasieg_tof = tofsensor.readRangeSingleMillimeters();
+	uint8_t zasieg_tof = 0;
+
+	// Serial.println(String(zasieg_tof));
+
+	if (tryb_konfiguracji)
+	{
+		Led::Konfiguracja(konfiguracja_zakonczona);
+
+		if (konfiguracja_zakonczona)
+			return;
+
+		//zapisz_do_eeprom(String(zasieg_tof));
+		//String zasieg_tof_str = String(zasieg_tof);
+		//Tof::zapisz(zasieg_tof_str);
+
+		konfiguracja_zakonczona = true;
+
+		return;
+	}
+
+	bool httpStan = false;
+
 	// Przejście w stan deepSleep
 	// jeżeli odpowiedź serwera ma kod 200 => OK
 	if (httpStan)
 	{
-		digitalWrite(LED_VCC, 1);
-		ESP.deepSleep(0);
+		digitalWrite(LED_VCC, 0);
+		ESP.deepSleep(0, WAKE_RF_DEFAULT);
+	}
+
+	if (WiFi.status() == WL_CONNECTED)
+	{
+		httpStan = abc();
+		//Led::LaczenieWiFi(true);
+		return;
+	}
+
+	//Led::LaczenieWiFi(false);
+
+	//try not to reuse begin(ssid,pwd) as some blogs
+	//mention possible corruption of the flash memory
+	if (String(ssid) != WiFi.SSID())
+	{
+		Serial.print("Connecting to ");
+		Serial.print(ssid);
+		WiFi.begin(ssid, password);
+
+		digitalWrite(LED_BLUE, 1);
+		digitalWrite(LED_RED, 0);
+	}
+	else
+	{
+		//not supposed to happen with WiFi.persistent(false)
+		Serial.print("Connecting using saved credentials");
+		WiFi.begin();
+	}
+
+	Serial.println("...");
+	if (WiFi.waitForConnectResult() == WL_CONNECTED)
+	{
+		Serial.println("WiFi connected");
+	}
+	else
+	{
+		//scan for networks if connection fails
+		Serial.println("scan start");
+		// WiFi.scanNetworks will return the number of networks found
+		int n = WiFi.scanNetworks();
+		Serial.println("scan done");
+		if (n == 0)
+			Serial.println("no networks found");
+		else
+		{
+			Serial.print(n);
+			Serial.println(" networks found");
+			for (int i = 0; i < n; ++i)
+			{
+				// Print SSID and RSSI for each network found
+				Serial.print(i + 1);
+				Serial.print(": ");
+				Serial.print(WiFi.SSID(i));
+				Serial.print(" (");
+				Serial.print(WiFi.RSSI(i));
+				Serial.print(")");
+				Serial.println((WiFi.encryptionType(i) == ENC_TYPE_NONE) ? " " : "*");
+				delay(10);
+			}
+		}
 	}
 }

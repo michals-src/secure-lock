@@ -84,6 +84,9 @@ public:
 
         if (server_stan)
         {
+            digitalWrite(LED_RED, 1);
+            digitalWrite(LED_GREEN, 1);
+
             if (millis() - Led::zapisCzas < 1500)
             {
                 digitalWrite(LED_BLUE, 0);
