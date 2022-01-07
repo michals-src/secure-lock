@@ -5,7 +5,7 @@ class Led
 public:
     static unsigned long zapisCzas;
     static bool led_ostatni_stan;
-    static unsigned int itor;
+    static uint8_t itor;
 
     static void Konfiguracja(bool status)
     {
@@ -42,7 +42,7 @@ public:
             digitalWrite(LED_GREEN, 1);
 
             analogWrite(LED_BLUE, Led::itor);
-            Serial.println(Led::itor);
+            //Serial.println(Led::itor);
 
             if (Led::led_ostatni_stan == false)
             {
@@ -107,8 +107,30 @@ public:
 
         return false;
     }
+
+    static void ToF_nieznaleziono(bool status)
+    {
+        if (status)
+        {
+            digitalWrite(LED_RED, 1);
+            digitalWrite(LED_GREEN, 1);
+            digitalWrite(LED_BLUE, 1);
+
+            return;
+        }
+
+        if (millis() - Led::zapisCzas < 150)
+            return;
+
+        digitalWrite(LED_GREEN, 1);
+        digitalWrite(LED_BLUE, 1);
+
+        digitalWrite(LED_RED, led_ostatni_stan);
+        led_ostatni_stan = !led_ostatni_stan;
+        Led::zapisCzas = millis();
+    }
 };
 
 unsigned long Led::zapisCzas = millis();
 bool Led::led_ostatni_stan = false;
-unsigned int Led::itor = 0;
+uint8_t Led::itor = 0;
