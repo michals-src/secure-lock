@@ -10,9 +10,12 @@ public:
      * Zapis wartosci do pamieci eeprom
      * return void
      */
-    static void zapisz(String wartosc)
+    static void zapisz(uint16_t wartosc)
     {
-        uint16_t dlugosc = 4;
+        uint16_t dlugosc = 16;
+
+        byte byte1 = wartosc >> 8;
+        byte byte2 = wartosc & 0xFF;
 
         EEPROM.begin(dlugosc);
 
@@ -23,15 +26,8 @@ public:
         EEPROM.commit();
         delay(500);
 
-        // Zapisanie odleglosci w pamieci eeprom
-        // od 4 bitu do 0
-        for (uint8_t j = 4; j >= 0; j--)
-        {
-            if (4 - j > wartosc.length())
-                break;
-            uint8_t diff = 4 - j;
-            EEPROM.write(j, wartosc[(wartosc.length() - 1) - diff]);
-        }
+        EEPROM.write(0, byte1);
+        EEPROM.write(1, byte2);
 
         EEPROM.commit();
         EEPROM.end();
@@ -41,19 +37,16 @@ public:
      * Odczyt zapisanej wartosci z pamieci eeprom
      * return uint8_t
      */
-    static uint8_t odczytaj()
+    static uint16_t odczytaj()
     {
-        uint16_t dlugosc = 4;
-        String wartosc = "";
-
+        uint8_t dlugosc = 16;
         EEPROM.begin(dlugosc);
 
-        for (uint8_t i = 0; i <= dlugosc; i++)
-        {
-            wartosc += char(EEPROM.read(i));
-        }
+        byte rbyte1 = EEPROM.read(0);
+        byte rbyte2 = EEPROM.read(0 + 1);
+        uint16_t wartosc = (rbyte1 << 8) + rbyte2;
 
-        return wartosc.toInt();
+        return wartosc;
     }
 };
 

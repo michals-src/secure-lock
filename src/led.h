@@ -101,6 +101,7 @@ public:
             return false;
 
         digitalWrite(LED_BLUE, 1);
+        digitalWrite(LED_GREEN, 1);
         digitalWrite(LED_RED, led_ostatni_stan);
         led_ostatni_stan = !led_ostatni_stan;
         Led::zapisCzas = millis();

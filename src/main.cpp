@@ -82,6 +82,65 @@ uint16_t czytaj_z_eeprom()
 	return 0;
 }
 
+bool centrala_komunikacja()
+{
+
+	//Opóxnienie odczytu
+	if (millis() - timer1 < 300)
+		return;
+
+	uint16_t zasieg_tof = tofsensor.readRangeSingleMillimeters() - 50;
+	bool httpStan = false;
+
+	WiFiClient client;
+	HTTPClient http; //must be declared after WiFiClient for correct destruction order, because used by http.begin(client,...)
+
+	Serial.print("connecting to ");
+	Serial.print(host);
+	Serial.print(':');
+	Serial.println(port);
+
+	// Odczytanie wartosci zapisanej odleflosci do obiektu
+	uint16_t pamiec_wartosc = Tof::odczytaj();
+	String endpoint = "http://192.168.8.5/drzwi_otwarte";
+	Serial.print(String(pamiec_wartosc));
+	Serial.print(" : ");
+	Serial.println(String(zasieg_tof));
+
+	if (zasieg_tof <= pamiec_wartosc + 10 && zasieg_tof >= pamiec_wartosc - 10)
+	{
+		// Odleglosc do obiektu zgadza sie z wartoscia zapisana
+		endpoint = "http://192.168.8.5/drzwi_zamkniete";
+	}
+
+	// Wyslanie sygnalu do odbiornika
+	Serial.print("[HTTP] Begin. ");
+	Serial.println(endpoint);
+	http.begin(client, endpoint);
+	int httpCode = http.GET();
+
+	if (httpCode > 0)
+	{
+
+		httpStan = Led::HttpStan(httpCode == HTTP_CODE_OK);
+		// file found at server
+		if (httpStan)
+		{
+			Serial.println("[HTTP] HTTP_CODE_OK.");
+			Serial.println("[HTTP] zamknięto połączenie lub zakończenie pliku.");
+		}
+	}
+	else
+	{
+		httpStan = Led::HttpStan(false);
+		Serial.printf("[HTTP] GET... niepowodzenie, error: %s\n", http.errorToString(httpCode).c_str());
+	}
+
+	http.end();
+
+	return httpStan;
+}
+
 void setup()
 {
 
@@ -100,7 +159,7 @@ void setup()
 	{
 		Serial.println("Nie mozna zaladowac VL53L0X");
 		Led::ToF_nieznaleziono(false);
-		delay(100);
+		delay(500);
 	}
 
 	if (analogRead(A0) > 100)
@@ -133,79 +192,6 @@ void setup()
 	Serial.println(WiFi.localIP());
 }
 
-bool abc()
-{
-
-	bool httpBegin = false;
-	bool httpStan = false;
-	uint8_t zasieg_tof = 0;
-
-	WiFiClient client;
-	HTTPClient http; //must be declared after WiFiClient for correct destruction order, because used by http.begin(client,...)
-
-	Serial.print("connecting to ");
-	Serial.print(host);
-	Serial.print(':');
-	Serial.println(port);
-
-	// Odczytanie wartosci zapisanej odleflosci do obiektu
-	uint8_t odczytany_tof = czytaj_z_eeprom();
-
-	if (zasieg_tof > odczytany_tof + 10 || zasieg_tof < odczytany_tof - 10)
-	{
-
-		if (!httpBegin)
-		{
-			// Odleglosc do obiektu nie zgadza sie z wartoscia zapisana
-			// Wyslanie sygnalu do odbiornika
-
-			Serial.print("[HTTP] begin...\n");
-
-			// Wyslanie wiadomosci wylaczajacej przekaznik
-			http.begin(client, "http://192.168.8.5/drzwi_otwarte");
-			httpBegin = true;
-			//http.begin(client, "jigsaw.w3.org", 80, "/HTTP/connection.html");
-		}
-	}
-	else
-	{
-
-		if (!httpBegin)
-		{
-			Serial.print("[HTTP] begin...\n");
-
-			// Wyslanie wiadomosci wylaczajacej przekaznik
-			//http.begin(client, "http://192.168.8.5/drzwi_zamkniete");
-			http.begin(client, "http://192.168.8.5/");
-			//http.begin(client, "jigsaw.w3.org", 80, "/HTTP/connection.html");
-			httpBegin = true;
-		}
-	}
-
-	int httpCode = http.GET();
-
-	if (httpCode > 0)
-	{
-
-		httpStan = Led::HttpStan(httpCode == HTTP_CODE_OK);
-		// file found at server
-		if (httpStan)
-		{
-			Serial.println("[HTTP] HTTP_CODE_OK.");
-			Serial.println("[HTTP] zamknięto połączenie lub zakończenie pliku.");
-		}
-	}
-	else
-	{
-		httpStan = Led::HttpStan(false);
-		Serial.printf("[HTTP] GET... niepowodzenie, error: %s\n", http.errorToString(httpCode).c_str());
-	}
-
-	http.end();
-
-	return httpStan;
-}
-
 void loop()
 {
 
@@ -215,10 +201,7 @@ void loop()
 
 	timer1 = millis();
 
-	uint16_t zasieg_tof = tofsensor.readRangeSingleMillimeters();
-	//uint8_t zasieg_tof = 0;
-
-	Serial.println(String(zasieg_tof));
+	uint16_t zasieg_tof = tofsensor.readRangeSingleMillimeters() - 50;
 
 	if (tryb_konfiguracji)
 	{
@@ -231,11 +214,10 @@ void loop()
 		}
 
 		//zapisz_do_eeprom(String(zasieg_tof));
-		String zasieg_tof_str = String(zasieg_tof);
-		Tof::zapisz(zasieg_tof_str);
+		Tof::zapisz(zasieg_tof);
 
 		Serial.print("Zapis: ");
-		Serial.println(String(zasieg_tof_str));
+		Serial.println(String(zasieg_tof));
 
 		konfiguracja_zakonczona = true;
 
@@ -246,11 +228,11 @@ void loop()
 
 	if (WiFi.status() == WL_CONNECTED)
 	{
-		httpStan = abc();
+		httpStan = centrala_komunikacja();
 		Led::LaczenieWiFi(true);
 
 		// Przejście w stan deepSleep
-		// jeżeli odpowiedź serwera ma kod 200 => OK
+		// jeżeli odpowiedź serwera ma status 200
 		if (httpStan)
 		{
 			digitalWrite(LED_VCC, 0);
