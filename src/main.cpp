@@ -31,17 +31,16 @@ enum DIODA_LED
 {
   R_LED = D4,
   G_LED = D3,
-  B_LED = D1
+  B_LED = D2
 };
 
 enum PRZEKAZNIK_PINY
 {
   PRZEKAZNIK_C1 = D0,
   PRZEKAZNIK_C2 = D1
-}
+};
 
-void
-handleRoot()
+void handleRoot()
 {
   server.send(200, "text/html", "<h1>Centrala systemu wykrywania otwierania drzwi</h1>");
 }
@@ -49,23 +48,23 @@ handleRoot()
 void handleDetector_drzwi_otwarte()
 {
   server.send(200, "text/html", "<h1>Drzwi są otwarte, rozłączenie przełącznika</h1>");
-  digitialWrite(PRZEKAZNIK_C1, LOW);
-  digitialWrite(PRZEKAZNIK_C2, LOW);
+  digitalWrite(PRZEKAZNIK_C1, LOW);
+  digitalWrite(PRZEKAZNIK_C2, LOW);
 
-  digitialWrite(G_LED, HIGH);
-  digitialWrite(B_LED, HIGH);
-  digitialWrite(R_LED, LOW);
+  digitalWrite(G_LED, HIGH);
+  digitalWrite(B_LED, HIGH);
+  digitalWrite(R_LED, LOW);
 }
 
 void handleDetector_drzwi_zamkniete()
 {
   server.send(200, "text/html", "<h1>Drzwi są zamknięte, włączenie przełącznika</h1>");
-  digitialWrite(PRZEKAZNIK_C1, HIGH);
-  digitialWrite(PRZEKAZNIK_C2, HIGH);
+  digitalWrite(PRZEKAZNIK_C1, HIGH);
+  digitalWrite(PRZEKAZNIK_C2, HIGH);
 
-  digitialWrite(R_LED, HIGH);
-  digitialWrite(B_LED, HIGH);
-  digitialWrite(G_LED, LOW);
+  digitalWrite(R_LED, HIGH);
+  digitalWrite(B_LED, HIGH);
+  digitalWrite(G_LED, LOW);
 }
 
 void ustawienia_pinow()
@@ -88,9 +87,9 @@ void setup()
 {
 
   ustawienia_pinow();
-  digitialWrite(R_LED, HIGH);
-  digitialWrite(B_LED, HIGH);
-  digitialWrite(G_LED, HIGH);
+  digitalWrite(R_LED, HIGH);
+  digitalWrite(B_LED, HIGH);
+  digitalWrite(G_LED, HIGH);
 
   Serial.begin(115200);
   Serial.println();
@@ -114,10 +113,10 @@ void setup()
   server.begin();
 
   Serial.println("HTTP server started");
-  digitialWrite(B_LED, LOW);
+  //digitalWrite(B_LED, LOW);
 
   czas_pracy = millis();
-  softap_stations_count_last = "0";
+  softap_stations_count_last = 0;
   led_ostatni_stan = false;
   pwm_dir = false;
   itor_pwm = 0;
@@ -131,30 +130,26 @@ void loop()
   softap_stations_count = wifi_softap_get_station_num();
 
   //Sygnalizacja diodą jeżeli nie ma połączonych clientów
-  if (softap_stations_count == "0")
+  if (softap_stations_count == 0)
   {
-    if (millis() - czas_pracy > 30)
-    {
+    // Wzrost wartości pwm w zakresie 0-255
+    if (!pwm_dir)
+      itor_pwm++;
 
-      // Wzrost wartości pwm w zakresie 0-255
-      if (!pwm_dir)
-        itor_pwm++;
+    // Spadek wartości pwm w zakresie 0-255
+    if (pwm_dir)
+      itor_pwm--;
 
-      // Spadek wartości pwm w zakresie 0-255
-      if (itor_pwm)
-        itor_pwm--;
+    digitalWrite(R_LED, HIGH);
+    digitalWrite(G_LED, HIGH);
+    analogWrite(B_LED, itor_pwm);
 
-      digitalWrite(R_LED, HIGH);
-      digitalWrite(G_LED, HIGH);
-      digitalWrite(B_LED, itor_pwm);
+    // Określenie, czy sygnał pwm ma rosnąć bądź maleć
+    if (itor_pwm >= 255 & !pwm_dir)
+      pwm_dir = true;
 
-      // Określenie, czy sygnał pwm ma rosnąć bądź maleć
-      if (itor_pwm >= 255 & !pwm_dir)
-        pwm_dir = true;
-
-      if (itor_pwm <= 0 & pwm_dir)
-        pwm_dir = false;
-    }
+    if (itor_pwm <= 0 & pwm_dir)
+      pwm_dir = false;
   }
 
   // Sygnalizacja diodą o nowym cliencie połączonym z centralą
