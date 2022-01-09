@@ -24,11 +24,14 @@ unsigned char softap_stations_count_last;
 unsigned char softap_stations_count;
 bool led_ostatni_stan;
 
+bool pwm_dir;
+uint16_t itor_pwm;
+
 enum DIODA_LED
 {
-  R_LED = D2,
+  R_LED = D4,
   G_LED = D3,
-  B_LED = D4
+  B_LED = D1
 };
 
 enum PRZEKAZNIK_PINY
@@ -56,7 +59,7 @@ void handleDetector_drzwi_otwarte()
 
 void handleDetector_drzwi_zamkniete()
 {
-  server.send(200, "text/html", "<h1>You are connected</h1>");
+  server.send(200, "text/html", "<h1>Drzwi są zamknięte, włączenie przełącznika</h1>");
   digitialWrite(PRZEKAZNIK_C1, HIGH);
   digitialWrite(PRZEKAZNIK_C2, HIGH);
 
@@ -76,6 +79,7 @@ void ustawienia_pinow()
 
 void http_punktykoncowe()
 {
+  server.on("/", handleRoot);
   server.on("/drzwi_otwarte", handleDetector_drzwi_otwarte);
   server.on("/drzwi_zamkniete", handleDetector_drzwi_zamkniete);
 }
@@ -115,6 +119,8 @@ void setup()
   czas_pracy = millis();
   softap_stations_count_last = "0";
   led_ostatni_stan = false;
+  pwm_dir = false;
+  itor_pwm = 0;
 }
 
 void loop()
@@ -123,6 +129,35 @@ void loop()
     return;
 
   softap_stations_count = wifi_softap_get_station_num();
+
+  //Sygnalizacja diodą jeżeli nie ma połączonych clientów
+  if (softap_stations_count == "0")
+  {
+    if (millis() - czas_pracy > 30)
+    {
+
+      // Wzrost wartości pwm w zakresie 0-255
+      if (!pwm_dir)
+        itor_pwm++;
+
+      // Spadek wartości pwm w zakresie 0-255
+      if (itor_pwm)
+        itor_pwm--;
+
+      digitalWrite(R_LED, HIGH);
+      digitalWrite(G_LED, HIGH);
+      digitalWrite(B_LED, itor_pwm);
+
+      // Określenie, czy sygnał pwm ma rosnąć bądź maleć
+      if (itor_pwm >= 255 & !pwm_dir)
+        pwm_dir = true;
+
+      if (itor_pwm <= 0 & pwm_dir)
+        pwm_dir = false;
+    }
+  }
+
+  // Sygnalizacja diodą o nowym cliencie połączonym z centralą
   if (softap_stations_count_last != softap_stations_count)
   {
     for (uint8_t i = 0; i < 7; i++)
@@ -131,6 +166,8 @@ void loop()
       led_ostatni_stan = !led_ostatni_stan;
       delay(50);
     }
+
+    softap_stations_count_last = softap_stations_count;
   }
 
   server.handleClient();
