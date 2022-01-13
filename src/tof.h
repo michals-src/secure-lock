@@ -12,7 +12,7 @@ public:
      */
     static void zapisz(uint16_t wartosc)
     {
-        uint16_t dlugosc = 16;
+        uint16_t dlugosc = 3;
 
         byte byte1 = wartosc >> 8;
         byte byte2 = wartosc & 0xFF;

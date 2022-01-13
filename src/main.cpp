@@ -15,7 +15,7 @@
 #define RESET_EEPROM true
 
 #ifndef STASSID
-#define STASSID "ESPOdbiornik"
+#define STASSID "Nodemcu-CENTRALA"
 #define STAPSK "systemwykrywaniaotwieraniadrzwi"
 #endif
 
@@ -31,6 +31,20 @@ bool tryb_konfiguracji = false;
 bool konfiguracja_zakonczona = false;
 
 unsigned long timer1 = millis();
+
+IPAddress local_IP(192, 168, 8, 6);
+IPAddress gateway(192, 168, 8, 1);
+IPAddress mask(255, 255, 255, 0);
+
+struct
+{
+	uint32_t crc32;	  // 4 bytes
+	uint8_t channel;  // 1 byte,   5 in total
+	uint8_t bssid[6]; // 6 bytes, 11 in total
+	uint8_t padding;  // 1 byte,  12 in total
+} rtcData;
+
+uint8_t bssid[6] = {0x52, 0x02, 0x91, 0xDA, 0x5F, 0x9b}; // 52:02:91:da:5f:9b
 
 void ustawienia_pinow()
 {
@@ -76,20 +90,10 @@ void zapisz_do_eeprom(string wartosc)
 
 */
 
-uint16_t czytaj_z_eeprom()
-{
-
-	return 0;
-}
-
 bool centrala_komunikacja()
 {
 
-	//Opóxnienie odczytu
-	if (millis() - timer1 < 300)
-		return;
-
-	uint16_t zasieg_tof = tofsensor.readRangeSingleMillimeters() - 50;
+	uint16_t zasieg_tof = tofsensor.readRangeSingleMillimeters();
 	bool httpStan = false;
 
 	WiFiClient client;
@@ -141,11 +145,43 @@ bool centrala_komunikacja()
 	return httpStan;
 }
 
+// uint32_t calculateCRC32(const uint8_t *data, size_t length)
+// {
+// 	uint32_t crc = 0xffffffff;
+// 	while (length--)
+// 	{
+// 		uint8_t c = *data++;
+// 		for (uint32_t i = 0x80; i > 0; i >>= 1)
+// 		{
+// 			bool bit = crc & 0x80000000;
+// 			if (c & i)
+// 			{
+// 				bit = !bit;
+// 			}
+
+// 			crc <<= 1;
+// 			if (bit)
+// 			{
+// 				crc ^= 0x04c11db7;
+// 			}
+// 		}
+// 	}
+
+// 	return crc;
+// }
+
 void setup()
 {
 
 	// put your setup code here, to run once:
 	Serial.begin(115200);
+
+	// byte a = 100;
+	// byte b = 100 >> 8;
+
+	// Serial.println(a);
+	// Serial.println(b);
+
 	ustawienia_pinow();
 
 	Wire.begin(TOF_SDA, TOF_SCL);
@@ -170,38 +206,82 @@ void setup()
 		return;
 	}
 
-	Serial.println();
-	Serial.println();
-	Serial.print("Connecting to ");
-	Serial.println(ssid);
+	WiFi.disconnect();
+
+	// Serial.println();
+	// Serial.println();
+	// Serial.print("Connecting to ");
+	// Serial.println(ssid);
 
 	/* Explicitly set the ESP8266 to be a WiFi-client, otherwise, it by default,
      would try to act as both a client and an access-point and could cause
      network-issues with your other WiFi-devices on your WiFi-network. */
-	WiFi.mode(WIFI_STA);
-	WiFi.begin(ssid, password);
+	// WiFi.mode(WIFI_STA);
+	// WiFi.config(local_IP, gateway, mask);
 
+	// bool rtcValid = false;
+	// if (ESP.rtcUserMemoryRead(0, (uint32_t *)&rtcData, sizeof(rtcData)))
+	// {
+	// 	// Calculate the CRC of what we just read from RTC memory, but skip the first 4 bytes as that's the checksum itself.
+	// 	uint32_t crc = calculateCRC32(((uint8_t *)&rtcData) + 4, sizeof(rtcData) - 4);
+	// 	if (crc == rtcData.crc32)
+	// 	{
+	// 		rtcValid = true;
+	// 	}
+	// }
+
+	// if (rtcValid)
+	// {
+
+	WiFi.begin(ssid, password, 1, bssid);
+
+	// }
+	// else
+	// {
+	// 	WiFi.begin(ssid, password);
+	// }
+
+	// WiFi.persistent(true);
+	// WiFi.setAutoConnect(true);
+
+	// int retries = 0;
 	while (WiFi.status() != WL_CONNECTED)
 	{
+		// retries++;
+		// if (retries == 100)
+		// {
+		// 	// Quick connect is not working, reset WiFi and try regular connection
+		// 	WiFi.disconnect();
+		// 	delay(10);
+		// 	WiFi.forceSleepBegin();
+		// 	delay(10);
+		// 	WiFi.forceSleepWake();
+		// 	delay(10);
+		// 	WiFi.begin(ssid, password);
+		// }
+
 		Led::LaczenieWiFi(false);
 	}
 
-	Serial.println("");
-	Serial.println("WiFi connected");
-	Serial.println("IP address: ");
-	Serial.println(WiFi.localIP());
+	// rtcData.channel = WiFi.channel();
+	// memcpy(rtcData.bssid, WiFi.BSSID(), 6); // Copy 6 bytes of BSSID (AP's MAC address)
+	// rtcData.crc32 = calculateCRC32(((uint8_t *)&rtcData) + 4, sizeof(rtcData) - 4);
+	// ESP.rtcUserMemoryWrite(0, (uint32_t *)&rtcData, sizeof(rtcData));
 }
 
 void loop()
 {
 
 	// Praca z opźnieniem czasowym 50ms
-	if (millis() - timer1 < 10)
+	if (millis() - timer1 < 1000)
 		return;
 
 	timer1 = millis();
 
-	uint16_t zasieg_tof = tofsensor.readRangeSingleMillimeters() - 50;
+	uint16_t zasieg_tof = tofsensor.readRangeSingleMillimeters();
+	//Serial.println(String(zasieg_tof));
+	//delay(50);
+	//return;
 
 	if (tryb_konfiguracji)
 	{

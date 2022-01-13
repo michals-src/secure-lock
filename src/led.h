@@ -44,39 +44,31 @@ public:
             analogWrite(LED_BLUE, Led::itor);
             //Serial.println(Led::itor);
 
-            if (Led::led_ostatni_stan == false)
-            {
-                Led::itor++;
-            }
+            if (!Led::led_ostatni_stan)
+                Led::itor += 5;
 
-            if (Led::led_ostatni_stan == true)
-            {
-                Led::itor--;
-            }
+            if (Led::led_ostatni_stan)
+                Led::itor -= 5;
 
-            if (Led::itor > 255 && Led::led_ostatni_stan == false)
-            {
+            if (Led::itor >= 255 && !Led::led_ostatni_stan)
                 Led::led_ostatni_stan = true;
-            }
 
-            if (Led::itor <= 0 && Led::led_ostatni_stan == true)
-            {
+            if (Led::itor <= 0 && Led::led_ostatni_stan)
                 Led::led_ostatni_stan = false;
-            }
 
             Led::zapisCzas = millis();
 
             return;
         }
 
-        if (millis() - Led::zapisCzas < 5000)
-        {
-            digitalWrite(LED_GREEN, 0);
+        // if (millis() - Led::zapisCzas < 5000)
+        // {
+        //     digitalWrite(LED_GREEN, 0);
 
-            return;
-        }
+        //     return;
+        // }
 
-        digitalWrite(LED_GREEN, 1);
+        // digitalWrite(LED_GREEN, 1);
     }
 
     static bool HttpStan(bool server_stan)
