@@ -5,7 +5,7 @@
 #include <ESP8266WebServer.h>
 
 #ifndef APSSID
-#define APSSID "ESPOdbiornik"
+#define APSSID "Nodemcu-CENTRALA"
 #define APPSK "systemwykrywaniaotwieraniadrzwi"
 #endif
 
@@ -29,9 +29,9 @@ uint16_t itor_pwm;
 
 enum DIODA_LED
 {
-  R_LED = D4,
+  R_LED = D2,
   G_LED = D3,
-  B_LED = D2
+  B_LED = D4
 };
 
 enum PRZEKAZNIK_PINY
@@ -48,8 +48,8 @@ void handleRoot()
 void handleDetector_drzwi_otwarte()
 {
   server.send(200, "text/html", "<h1>Drzwi są otwarte, rozłączenie przełącznika</h1>");
-  digitalWrite(PRZEKAZNIK_C1, LOW);
-  digitalWrite(PRZEKAZNIK_C2, LOW);
+  digitalWrite(PRZEKAZNIK_C1, HIGH);
+  digitalWrite(PRZEKAZNIK_C2, HIGH);
 
   digitalWrite(G_LED, HIGH);
   digitalWrite(B_LED, HIGH);
@@ -59,8 +59,8 @@ void handleDetector_drzwi_otwarte()
 void handleDetector_drzwi_zamkniete()
 {
   server.send(200, "text/html", "<h1>Drzwi są zamknięte, włączenie przełącznika</h1>");
-  digitalWrite(PRZEKAZNIK_C1, HIGH);
-  digitalWrite(PRZEKAZNIK_C2, HIGH);
+  digitalWrite(PRZEKAZNIK_C1, LOW);
+  digitalWrite(PRZEKAZNIK_C2, LOW);
 
   digitalWrite(R_LED, HIGH);
   digitalWrite(B_LED, HIGH);
@@ -90,8 +90,13 @@ void setup()
   digitalWrite(R_LED, HIGH);
   digitalWrite(B_LED, HIGH);
   digitalWrite(G_LED, HIGH);
+  digitalWrite(PRZEKAZNIK_C1, LOW);
+  digitalWrite(PRZEKAZNIK_C2, LOW);
 
   Serial.begin(115200);
+
+  Serial.print("MAC: ");
+  Serial.println(WiFi.macAddress());
   Serial.println();
   Serial.print("Konfiguracja punktu dostępu");
   WiFi.softAPConfig(local_IP, gateway, mask);
@@ -103,7 +108,7 @@ void setup()
    * @param kanał, ustawiony na 1
    * @param ukryty, punktu dostępu nie jest publiczny
    */
-  WiFi.softAP(ssid, password, 1, true);
+  WiFi.softAP(ssid, password, 8, true);
 
   IPAddress myIP = WiFi.softAPIP();
   Serial.print("AP IP adres: ");
@@ -120,6 +125,10 @@ void setup()
   led_ostatni_stan = false;
   pwm_dir = false;
   itor_pwm = 0;
+
+  uint8_t macAddr[6];
+  WiFi.softAPmacAddress(macAddr);
+  Serial.printf("MAC address = %02x:%02x:%02x:%02x:%02x:%02x\n", macAddr[0], macAddr[1], macAddr[2], macAddr[3], macAddr[4], macAddr[5]);
 }
 
 void loop()
@@ -134,11 +143,11 @@ void loop()
   {
     // Wzrost wartości pwm w zakresie 0-255
     if (!pwm_dir)
-      itor_pwm++;
+      itor_pwm += 3;
 
     // Spadek wartości pwm w zakresie 0-255
     if (pwm_dir)
-      itor_pwm--;
+      itor_pwm -= 3;
 
     digitalWrite(R_LED, HIGH);
     digitalWrite(G_LED, HIGH);
@@ -153,7 +162,7 @@ void loop()
   }
 
   // Sygnalizacja diodą o nowym cliencie połączonym z centralą
-  if (softap_stations_count_last != softap_stations_count)
+  if (softap_stations_count_last < softap_stations_count)
   {
     for (uint8_t i = 0; i < 7; i++)
     {
@@ -163,6 +172,7 @@ void loop()
     }
 
     softap_stations_count_last = softap_stations_count;
+    digitalWrite(B_LED, HIGH);
   }
 
   server.handleClient();
