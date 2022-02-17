@@ -38,8 +38,8 @@ IPAddress mask(255, 255, 255, 0);
  * 
  */
 unsigned long czas_pracy;
-unsigned char softap_stations_count_last;
-unsigned char softap_stations_count;
+unsigned char softap_stajce_liczba;
+unsigned char softap_stajce;
 bool led_ostatni_stan;
 
 bool pwm_dir;
@@ -192,7 +192,7 @@ void setup()
    * 
    */
   czas_pracy = millis();
-  softap_stations_count_last = 0;
+  softap_stajce_liczba = 0;
   led_ostatni_stan = false;
   pwm_dir = false;
   itor_pwm = 0;
@@ -208,13 +208,13 @@ void loop()
     return;
 
   // Pobranie wartości połącznonych stacji do centrali
-  softap_stations_count = wifi_softap_get_station_num();
+  softap_stajce = wifi_softap_get_station_num();
 
   /**
    * @brief Sygnalizacja diodą jeżeli nie ma połączonych clientów
    * 
    */
-  if (softap_stations_count == 0)
+  if (softap_stajce == 0)
   {
     // Wzrost wartości pwm w zakresie 0-255
     if (!pwm_dir)
@@ -240,7 +240,7 @@ void loop()
    * @brief Sygnalizacja diodą o nowym cliencie połączonym z centralą
    * 
    */
-  if (softap_stations_count_last < softap_stations_count)
+  if (softap_stajce_liczba < softap_stajce)
   {
     for (uint8_t i = 0; i < 7; i++)
     {
@@ -249,7 +249,7 @@ void loop()
       delay(50);
     }
 
-    softap_stations_count_last = softap_stations_count;
+    softap_stajce_liczba = softap_stajce;
     digitalWrite(B_LED, HIGH);
   }
 
