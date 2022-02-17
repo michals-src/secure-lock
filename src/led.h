@@ -7,6 +7,7 @@ public:
     static bool led_ostatni_stan;
     static uint8_t itor;
 
+    // Dioda konfiguracji
     static void Konfiguracja(bool status)
     {
         //Stały kolor w trakcie trwania konfiguracji
@@ -30,6 +31,7 @@ public:
         }
     }
 
+    // Dioda łączenia WiFi
     static void LaczenieWiFi(bool statusWiFi)
     {
         if (statusWiFi == false)
@@ -42,7 +44,6 @@ public:
             digitalWrite(LED_GREEN, 1);
 
             analogWrite(LED_BLUE, Led::itor);
-            //Serial.println(Led::itor);
 
             if (!Led::led_ostatni_stan)
                 Led::itor += 5;
@@ -60,17 +61,9 @@ public:
 
             return;
         }
-
-        // if (millis() - Led::zapisCzas < 5000)
-        // {
-        //     digitalWrite(LED_GREEN, 0);
-
-        //     return;
-        // }
-
-        // digitalWrite(LED_GREEN, 1);
     }
 
+    //Dioda statusu połączenia http
     static bool HttpStan(bool server_stan)
     {
 
@@ -101,6 +94,7 @@ public:
         return false;
     }
 
+    // Dioda awarii ToF
     static void ToF_nieznaleziono(bool status)
     {
         if (status)
